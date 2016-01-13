@@ -59,7 +59,10 @@ function init(d3, CodeMirror, Baobab){
 
   var notebookPane = pane.filter(src)
     .append("iframe")
-    .attr({src: src})
+    .attr({
+      src: src,
+      sandbox: "allow-same-origin allow-scripts"
+    })
     .each(initFrame);
 
   var diffPane = pane.filter(not(src))
