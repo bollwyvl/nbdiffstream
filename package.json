@@ -1,0 +1,15 @@
+{
+  "name": "nbdiffstream",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "live": "live-server"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "live-server": "^0.9.0"
+  }
+}
