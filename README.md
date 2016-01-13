@@ -3,7 +3,7 @@
 
 
 ## Screenshot/Demo
-[![here's a diff](screenshot.png)](https://rawgit.com/bollwyvl/nbdiffstream/gh-pages/index.html)
+[![here's a diff](screenshot.png)](https://cdn.rawgit.com/bollwyvl/nbdiffstream/a43c6f9a252542512831a8ed42d87df6ca333284/index.html)
 
 
 ## Motivation
