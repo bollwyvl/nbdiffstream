@@ -1,50 +1,52 @@
 ;(function(){
+// asset sources to initially avoid toolchain
 var cdn = "https://cdn.jsdelivr.net/",
-  raw = "https://cdn.rawgit.com/",
-  config = {
+  raw = "https://cdn.rawgit.com/";
+
+// require config
+var config = {
     paths: {
       "d3": cdn + "d3js/3.5.12/d3.min",
-      "codemirror": cdn + "codemirror/4.5.0/codemirror.min",
       "baobab": raw + "Yomguithereal/baobab/2.3.0/build/baobab.min",
-      "sankey": raw + "d3/d3-plugins/c64935b/sankey/sankey"
     }
-  },
-  deps = [
-    "d3",
-    "codemirror",
-    "baobab"
-  ],
-  notebooks = [
-    "notebooks/8b6065c.html",
-    "notebooks/9f0fa95.html",
-    "notebooks/HEAD.html"
-  ],
-  panes = notebooks.reduce(function(m, d, i){
-    m.push({src: d});
-    if(i + 1 < notebooks.length){
-      m.push({
-        left: d,
-        right: notebooks[i + 1]
-      });
-    }
-    return m;
-  }, []);
+  };
 
+// list of refs... would be provided some other way, probably URL
+var notebooks = [
+    "8b6065c",
+    "9f0fa95",
+    "HEAD"
+  ];
+
+// generate the pane ID information ("real" data lives in the tree)
+var panes = notebooks.reduce(function(m, d, i){
+  m.push({src: d});
+  if(i + 1 < notebooks.length){
+    m.push({
+      left: d,
+      right: notebooks[i + 1]
+    });
+  }
+  return m;
+}, []);
+
+// functional stuff
 var not = function(fn){ return function(d){ return !fn(d)}},
-  src = function(d){ return d.src; };
+  src = function(d){ return d.src; },
+  html = function(d){ return "notebooks/" + d.src + ".html"; },
+  patch = function(d){
+    return "patches/" + [d.left, d.right].join("-") + ".patch.json";
+  };
 
-require(config, deps, function(d3, CodeMirror, Baobab){
-  require(config, ["sankey"], function(){
-    init(d3, CodeMirror, Baobab);
-  })
-});
-
-function init(d3, CodeMirror, Baobab){
+// main function what has access to deps
+function main(d3, Baobab){
+  // the data bus
   var tree = window.tree = new Baobab({
-    notebooks: {}
+    notebooks: {},
+    patches: {}
   });
 
-  tree.select("notebooks").on("update", updateSankey);
+  tree.select("notebooks").on("update", updateParts);
 
   var pane = d3.select(".main")
     .selectAll("div")
@@ -57,56 +59,135 @@ function init(d3, CodeMirror, Baobab){
       diff: not(src)
     });
 
-  var notebookPane = pane.filter(src)
-    .append("iframe")
-    .attr({
-      src: src,
-      sandbox: "allow-same-origin allow-scripts"
-    })
-    .each(initFrame);
+  // main typed selectors, handles init
+  var notebookPane = pane.filter(src).each(initFrame),
+    diffPane = pane.filter(not(src)).each(initDiff);
 
-  var diffPane = pane.filter(not(src))
-    .append("svg");
-
+  // setup iframe and events
   function initFrame(d){
-    var cellPath = ["notebooks", d.src, "cells"];
-    this.onload = function(){
-      d3.select(this.contentWindow).on("scroll", function(){
-        tree.set(["notebooks", d.src, "scroll"], this.scrollY);
-      });
+    var cellPath = ["notebooks", d.src, "parts"];
+    var pane = d3.select(this);
 
-      var frame = d3.select(this.contentDocument.body);
+    pane.append("div")
+      .classed({"doc-info": 1})
+      .append("div")
+      .classed({"doc-info-inner": 1})
+      .text(src);
 
-      frame
-        .style({padding: 0})
-        .selectAll("#menubar, .container-main > ol, footer")
-        .remove();
+    pane.append("iframe")
+      .attr({
+        src: html,
+        sandbox: "allow-same-origin allow-scripts"
+      })
+      .node().onload = function(){
+        d3.select(this.contentWindow).on("scroll", updateScroll(d));
 
-      frame.selectAll(".cell")
-        .each(function(_d, i){
-          var bb = this.getBoundingClientRect();
-          bb = {
-            x: bb.left,
-            y: bb.top,
-            w: bb.width,
-            h: bb.height
-          };
+        var frame = d3.select(this.contentDocument.body);
 
-          if(!tree.get(cellPath)){
-            tree.set(cellPath, []);
-          }
+        frame
+          .style({padding: "100px 0"})
+          .selectAll("#menubar, .container-main > ol, footer")
+          .remove();
 
-          tree.push(cellPath, bb);
-        });
+        // wait for slow loading stuff
+        setTimeout(function(){
+          frame.selectAll(".inner_cell, .output_wrapper")
+            .each(function(_d, i){
+              var part = d3.select(this);
+              var bb = this.getBoundingClientRect();
+              bb = {
+                x: bb.left,
+                y: bb.top,
+                w: bb.width,
+                h: bb.height,
+                part: part.classed("inner_cell") ? "source" : "output"
+              };
+
+              if(!tree.get(cellPath)){
+                tree.set(cellPath, []);
+              }
+
+              tree.push(cellPath, bb);
+            });
+        }, 1000);
+
     }
   }
 
-  var line = d3.svg.line();
+  var _scrollLock;
 
-  function updateSankey(){
+  /*
+    factory for a linked scroll updater based on data without binding
+
+    keep the middlemost parts lined up, relative to their middles
+  */
+  function updateScroll(d){
+    return function(){
+      if(_scrollLock){
+        return;
+      }
+      var y = this.scrollY,
+        height = this.document.documentElement.clientHeight,
+        middle = y + (height / 2);
+
+      tree.set(["notebooks", d.src, "scroll"], y);
+
+      var parts = tree.get(["notebooks", d.src, "parts"]),
+        best,
+        bottom;
+
+      // scan for the middlemost part
+      for(var i=0; i < parts.length; i++){
+        bottom = parts[i].y + parts[i].h;
+        if(middle >= parts[i].y && middle <= bottom ||
+          (i && (middle <= parts[i].y))){
+          best = parts[i];
+          break;
+        }
+      }
+
+      var midOffset = ((best.y + (best.h / 2)) - middle) / best.h;
+
+      _scrollLock = true;
+
+      notebookPane.selectAll("iframe")
+        .filter(function(dd){ return dd.src !== d.src; })
+        .each(function(d){
+          // TODO: resolve add/remove cells
+          var part = tree.get(["notebooks", d.src, "parts", i]),
+            doc = this.contentDocument.documentElement,
+            y = part.y + (part.h / 2) + (doc.clientHeight / -2) + (-midOffset * part.h);
+
+          y = y < 0 ? 0 : y;
+
+          this.contentWindow.scrollTo(0, y);
+          tree.set(["notebooks", d.src, "scroll"], y);
+        });
+
+      // gross... TODO: move to baobab?
+      setTimeout(function(){
+        _scrollLock = false;
+      }, 0);
+    }
+  }
+
+
+  function initDiff(d){
+    var pane = d3.select(this);
+
+    pane.append("svg");
+
+    d3.json(patch(d), function(changes){
+      tree.set(["changes", d.left, d.right], changes);
+    });
+  }
+
+
+  function updateParts(){
     diffPane.each(function(d){
-      var width = this.parentNode.clientWidth,
-        diff = d3.select(this)
+      var width = this.clientWidth,
+        diff = d3.select(this),
+        svg = diff.select("svg")
           .attr({width: width}),
         left = tree.get(["notebooks", d.left]),
         right = tree.get(["notebooks", d.right]);
@@ -115,25 +196,40 @@ function init(d3, CodeMirror, Baobab){
         return;
       }
 
-      var path = diff
-        .selectAll("path")
-        .data(d3.zip(left.cells, right.cells));
+      var path = svg
+        .selectAll("path.part")
+        .data(d3.zip(left.parts, right.parts));
 
       path.enter().append("path")
-        .attr({
-          fill: "rgba(0,0,0,0.1)",
-        });
-
-      var pad = 4;
+        .attr({"class": function(d){ return d[0].part; }})
+        .classed({part: 1})
+        .style({opacity: 0})
+        .transition()
+        .style({opacity: 1});
 
       path.attr({
         d: function(d){
-          return line([
-            [0, d[0].y - (left.scroll || 0) + pad],
-            [width, d[1].y - (right.scroll || 0) + pad],
-            [width, d[1].y + d[1].h - (right.scroll || 0) - pad],
-            [0, d[0].y + d[0].h - (left.scroll || 0) - pad]
-          ])
+          var yl0 = d[0].y - (left.scroll || 0),
+            yr0 = d[1].y - (right.scroll || 0),
+            yr1 = d[1].y + d[1].h - (right.scroll || 0),
+            yl1 = d[0].y + d[0].h - (left.scroll || 0),
+            points = [
+              "M", // moveto
+                [0, yl0],
+              "C", // curveto
+                [width * 0.5, yl0],
+                [width * 0.5, yr0],
+                [width, yr0],
+              "L", // lineto
+                [width, yr1],
+              "C",
+                [width * 0.5, yr1],
+                [width * 0.5, yl1],
+                [0, yl1],
+              "Z"
+            ];
+
+          return points.join(" ");
         }
       });
 
@@ -142,5 +238,8 @@ function init(d3, CodeMirror, Baobab){
     })
   }
 }
+
+// do the require thing
+require(config, ["d3", "baobab"], main);
 
 }).call(this);

@@ -2,11 +2,15 @@ body {
   margin: 0;
   padding: 0;
   overflow: hidden;
+  font-family: sans-serif;
 }
+
+
 .main {
   display: flex;
   position: relative;
 }
+
 .main .pane {
   flex: 1;
   border: none;
@@ -17,13 +21,35 @@ body {
   flex: 0.25;
 }
 
+.main .pane.diff svg {
+  width: 100%;
+  height: 100vh;
+}
+
+.main .pane.diff svg .part {
+  fill: rgba(0, 0, 0, 0.1);
+}
+.main .pane.diff svg .part.output {
+  fill: rgba(0, 0, 0, 0.05);
+}
+
+.main .pane.notebook {
+  position: relative;
+}
+
 .main .pane.notebook iframe {
   width: 100%;
   height: 100vh;
   border: none;
 }
 
-.main .pane.diff svg {
+.main .pane.notebook .doc-info {
+  position: absolute;
   width: 100%;
-  height: 100vh;
+  background-color: #fff;
+  opacity: 0.9;
+}
+
+.main .pane.notebook .doc-info .doc-info-inner {
+  padding: 10px;
 }
