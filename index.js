@@ -1,6 +1,9 @@
 define(
-["d3", "baobab"],
-function(d3, Baobab){
+["d3", "baobab", "jsondiffpatch"],
+function(d3, Baobab, jsondiffpatch){
+
+var jdp = jsondiffpatch.create({textDiff: {minLength: 2}});
+
 var nbdiffstream = function(){
 /* END BOILERPLATE*/
 
@@ -8,6 +11,7 @@ var nbdiffstream = function(){
 var not = function(fn){ return function(d){ return !fn(d)}},
   src = function(d){ return d.src; },
   data = function(e){ return e.data.currentData; },
+  label = function(d){ return d.label; }
   screen = function(frame){
     var w = frame ? frame.contentWindow : window,
       d = frame ? frame.contentDocument : document,
@@ -16,6 +20,17 @@ var not = function(fn){ return function(d){ return !fn(d)}},
       x = w.innerWidth || e.clientWidth || g.clientWidth,
       y = w.innerHeight|| e.clientHeight|| g.clientHeight;
     return [x, y];
+  },
+  uniqueSubstring = function(needle, haystacks){
+    var diffs = haystacks.map(function(stack){
+      return jdp.diff(stack, needle);
+    })
+    .filter(function(diff){ return diff; })
+    .map(function(diff){
+      return diff[0].split("\n")
+        .filter(function(d){ return d[0] === "+"; })
+    });
+    return d3.max(diffs)[0].slice(1);
   };
 
 // a baobab tree
@@ -75,7 +90,10 @@ api.onCursor.hash = function(hash){
     });
 
   _cur.panes.set(notebooks.reduce(function(memo, d, i){
-    memo.push({src: d});
+    memo.push({
+      src: d,
+      label: decodeURI(uniqueSubstring(d, notebooks))
+    });
     if(i + 1 < notebooks.length){
       memo.push({left: d, right: notebooks[i + 1]});
     }
@@ -157,7 +175,8 @@ api.enter.notebook = function(pane){
   pane.append("div")
     .classed({"doc-info": 1})
   .append("div")
-    .classed({"doc-info-inner": 1});
+    .classed({"doc-info-inner": 1})
+    .text(label);
 
   pane.append("iframe")
     .attr({
