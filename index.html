@@ -4,8 +4,33 @@
     <link rel="stylesheet" href="index.css"/>
   </head>
   <body>
-    <script data-main="index" src="//cdn.jsdelivr.net/g/requirejs">
-      </script>
     <div class="main"></div>
+    <script src="//cdn.jsdelivr.net/g/requirejs">
+      </script>
+    <script>
+      ;(function(){
+        // asset sources to initially avoid toolchain
+        var cdn = "https://cdn.jsdelivr.net/",
+          raw = "https://cdn.rawgit.com/";
+
+        // require config
+        var config = {
+          paths: {
+            d3: cdn + "d3js/3.5.12/d3.min",
+            baobab: raw + "Yomguithereal/baobab/2.3.0/build/baobab.min",
+            nbdiffstream: "./index"
+          }
+        };
+
+        require(
+          config,
+          ["nbdiffstream"],
+          function(nbdiffstream){
+            var nbd = window.nbd = nbdiffstream();
+            // do config
+            nbd.init();
+          });
+      }).call(this);
+    </script>
   </body>
 </html>
