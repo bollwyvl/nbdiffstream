@@ -30,7 +30,7 @@ var not = function(fn){ return function(d){ return !fn(d)}},
       return diff[0].split("\n")
         .filter(function(d){ return d[0] === "+"; })
     });
-    return d3.max(diffs)[0].slice(1);
+    return !diffs.length ? needle : d3.max(diffs)[0].slice(1);
   };
 
 // a baobab tree
@@ -118,6 +118,7 @@ api.onCursor.panes = function(panes){
 
   pane.exit().remove();
 
+  pane.order();
   // main typed selectors, handles init
   // pane.filter(src).call(api.update.notebook),
   pane.filter(not(src)).call(api.update.diff);
