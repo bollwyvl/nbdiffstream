@@ -19,7 +19,8 @@
             d3: cdn + "d3js/3.5.12/d3.min",
             baobab: raw + "Yomguithereal/baobab/2.3.0/build/baobab.min",
             nbdiffstream: "./index",
-            jsondiffpatch: raw + "benjamine/jsondiffpatch/v0.1.38/public/build/jsondiffpatch-full.min"
+            jsondiffpatch: raw + "benjamine/jsondiffpatch/v0.1.38/public/build/jsondiffpatch-full.min",
+            braces: "vendor/braces"
           }
         };
 
@@ -29,7 +30,8 @@
           function(nbdiffstream){
             var nbd = window.nbd = nbdiffstream();
             // do config
-            nbd.init();
+            nbd.init({
+              hash: "#/notebooks/{8b6065c,9f0fa95,HEAD}.html"});
           });
       }).call(this);
     </script>

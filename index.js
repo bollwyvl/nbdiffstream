@@ -1,6 +1,6 @@
 define(
-["d3", "baobab", "jsondiffpatch"],
-function(d3, Baobab, jsondiffpatch){
+["d3", "baobab", "jsondiffpatch", "braces"],
+function(d3, Baobab, jsondiffpatch, braces){
 
 var jdp = jsondiffpatch.create({textDiff: {minLength: 2}});
 
@@ -21,7 +21,7 @@ var not = function(fn){ return function(d){ return !fn(d)}},
       y = w.innerHeight|| e.clientHeight|| g.clientHeight;
     return [x, y];
   },
-  uniqueSubstring = function(needle, haystacks){
+  diffLabel = function(needle, haystacks){
     var diffs = haystacks.map(function(stack){
       return jdp.diff(stack, needle);
     })
@@ -29,7 +29,8 @@ var not = function(fn){ return function(d){ return !fn(d)}},
     .map(function(diff){
       return diff[0].split("\n")
         .filter(function(d){ return d[0] === "+"; })
-    });
+    })
+    .filter(function(d){ return d && d.length; });
     return !diffs.length ? needle : d3.max(diffs)[0].slice(1);
   };
 
@@ -40,17 +41,17 @@ var _tree,
 
 var api = function(){ return api; };
 
-api.init = function(){
-  api.init.tree()
+api.init = function(options){
+  api.init.tree(options)
     .listeners();
 
   // fire it up
-  api.onCursor.hash(window.location.hash);
 
+  api.onCursor.hash(window.location.hash = options.hash || window.location.hash);
   return api;
 };
 
-api.init.tree = function(){
+api.init.tree = function(options){
   _tree = new Baobab({
     notebooks: {}
   });
@@ -84,15 +85,12 @@ api.onCursor = function(){};
 
 // when the window has changes
 api.onCursor.hash = function(hash){
-  var notebooks = hash.split("#").slice(1)
-    .filter(function(url){
-      return url && url.indexOf("/") === 0;
-    });
+  var notebooks = braces(hash.slice(1));
 
   _cur.panes.set(notebooks.reduce(function(memo, d, i){
     memo.push({
       src: d,
-      label: decodeURI(uniqueSubstring(d, notebooks))
+      label: decodeURI(diffLabel(d, notebooks))
     });
     if(i + 1 < notebooks.length){
       memo.push({left: d, right: notebooks[i + 1]});
